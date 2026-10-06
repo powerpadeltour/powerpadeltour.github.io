@@ -103,6 +103,31 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .sc button{background:var(--gold);color:#111;border:0;border-radius:6px;font-weight:800;font-size:12px;padding:5px 7px;cursor:pointer}
 .sc button[disabled]{opacity:.4;cursor:default}
 
+/* knockout */
+.subtabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px}
+.subtab{flex:none;background:none;border:1px solid var(--line);border-radius:999px;padding:5px 12px;font:700 13px var(--cond);letter-spacing:1px;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.subtab[aria-pressed="true"]{border-color:var(--gold);color:var(--gold)}
+.round{margin-bottom:18px}
+.round h3{font-family:var(--display);font-style:italic;font-weight:900;font-size:20px;margin-bottom:8px;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.round h3 small{font:600 13px var(--cond);letter-spacing:1px;color:var(--muted);font-style:normal}
+.kos{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:8px}
+@media (max-width:420px){.kos{grid-template-columns:1fr}}
+.ko{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.ko .lbl{font-size:12px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;display:flex;justify-content:space-between}
+.side{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;font-weight:800;text-transform:uppercase;font-size:14px;min-width:0}
+.side .tn{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.side .tn.ph{color:var(--muted);font-weight:600;text-transform:none}
+.side.w .tn{color:var(--gold)}
+.side .g{font-family:var(--display);font-weight:600;font-size:18px;min-width:26px;text-align:center;background:var(--surface-2);border-radius:6px;font-variant-numeric:tabular-nums}
+.ko select{width:100%;min-width:0;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;font:700 13px var(--cond);padding:4px}
+.ko .adm{display:grid;grid-template-columns:1fr 44px;gap:6px;align-items:center}
+.ko .adm .fix{font-weight:800;text-transform:uppercase;font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.ko .adm .fix.ph{color:var(--muted);text-transform:none;font-weight:600}
+.ko .adm input{width:44px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--fg);text-align:center;font:600 17px var(--display);padding:2px}
+.ko .save{align-self:flex-end;background:var(--gold);color:#111;border:0;border-radius:6px;font-weight:800;font-size:12px;padding:5px 10px;cursor:pointer}
+.champ{background:linear-gradient(90deg,var(--gold-soft),transparent);border:1px solid var(--gold);border-radius:12px;padding:12px 14px;margin-bottom:14px;font-weight:800;text-transform:uppercase}
+.champ b{color:var(--gold);font-family:var(--display);font-style:italic;font-size:22px;display:block}
+
 /* share */
 .shr{background:var(--surface-2);border:1px solid var(--line);border-radius:999px;color:var(--fg);font:700 13px var(--cond);letter-spacing:1px;padding:6px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;flex:none}
 .shr:hover{border-color:var(--gold);color:var(--gold)}
@@ -248,9 +273,50 @@ function standings(g){
     if (!s || s.a === s.b) return 0; const xWon = (PAIRS[k][0]===x.i) ? s.a > s.b : s.b > s.a; return xWon ? -1 : 1; };
   return teams.sort((x, y) => (y.w - x.w) || ((y.gf-y.ga) - (x.gf-x.ga)) || h2h(x, y) || (y.gf - x.gf) || (x.i - y.i));
 }
+let sub = "groups";
+const ROUNDS = {
+  R16: {name: "Round of 16", n: 8, pool: w => Object.keys(EV.groups).map(g => posKey(g, w === "t1" ? 1 : 2)).filter(Boolean),
+        ph: () => ["A group winner", "A group runner-up"], note: "Draw · each group winner vs a runner-up from another group"},
+  QF:  {name: "Quarter final", n: 4, pool: () => winners("R16", 8), note: "Open draw · no repeat match-ups"},
+  SF:  {name: "Semi final", n: 2, pool: () => winners("QF", 4), note: "Open draw"},
+  F:   {name: "Final", n: 1, auto: () => [winnerOf("SF-1"), winnerOf("SF-2")], ph: () => ["Winner SF 1", "Winner SF 2"]},
+  CQF: {name: "Comeback · Quarter final", n: 4, pool: () => Object.keys(EV.groups).map(g => posKey(g, 3)).filter(Boolean), note: "The 8 third-placed teams · open draw"},
+  CSF: {name: "Comeback · Semi final", n: 2, pool: () => winners("CQF", 4)},
+  CF:  {name: "Comeback · Final", n: 1, auto: () => [winnerOf("CSF-1"), winnerOf("CSF-2")], ph: () => ["Winner CB SF 1", "Winner CB SF 2"]},
+};
+const groupDone = g => PAIRS.every((_, k) => scores[`${g}-${k+1}`]);
+const posKey = (g, pos) => groupDone(g) ? `${g}:${standings(g)[pos-1].i}` : null;
+const teamOf = key => { if (!key) return null; const [g, i] = key.split(":"); return EV.groups[g] && EV.groups[g][+i]; };
+function teamsOf(id){ const [r, n] = id.split("-"), RR = ROUNDS[r], sc = scores[id] || {};
+  if (RR.auto) return RR.auto(+n - 1); return [sc.t1 || null, sc.t2 || null]; }
+function winnerOf(id){ const sc = scores[id]; if (!sc || !Number.isFinite(sc.a) || !Number.isFinite(sc.b) || sc.a === sc.b) return null;
+  const [t1, t2] = teamsOf(id); return sc.a > sc.b ? t1 : t2; }
+const winners = (r, n) => Array.from({length: n}, (_, k) => winnerOf(`${r}-${k+1}`)).filter(Boolean);
+const keyLabel = key => { const t = teamOf(key); return t ? t.map(pl).join(" / ") : ""; };
+const keyText = key => { const t = teamOf(key); return t ? teamName(t) : ""; };
+function koMatch(r, k){
+  const RR = ROUNDS[r], id = `${r}-${k}`, sc = scores[id] || {}, [t1, t2] = teamsOf(id), ph = RR.ph ? RR.ph(k-1) : ["To be drawn", "To be drawn"];
+  const has = Number.isFinite(sc.a) && Number.isFinite(sc.b), w = winnerOf(id);
+  const side = (t, g, i) => `<div class="side ${w && w === t ? "w" : ""}"><span class="tn ${t ? "" : "ph"}">${t ? keyLabel(t) : esc(ph[i])}</span><span class="g">${has ? g : "–"}</span></div>`;
+  let body;
+  if (canWrite) {
+    const open = !!RR.pool;
+    const used = new Set(); if (open) for (let j = 1; j <= RR.n; j++) if (j !== k) { const o = scores[`${r}-${j}`] || {}; if (o.t1) used.add(o.t1); if (o.t2) used.add(o.t2); }
+    const pick = (cur, which, i) => open
+      ? `<select id="ko-${id}-${which}" aria-label="Team ${i+1}"><option value="">${r === "R16" ? (which === "t1" ? "— group winner —" : "— runner-up —") : "— pick team —"}</option>${RR.pool(which).filter(x => x === cur || !used.has(x)).map(x => `<option value="${x}" ${x===cur?"selected":""}>${esc(keyText(x))} (${x.split(":")[0]})</option>`).join("")}</select>`
+      : `<span class="fix ${cur ? "" : "ph"}">${cur ? esc(keyText(cur)) : esc(ph[i])}</span>`;
+    body = `<div class="adm">${pick(t1, "t1", 0)}<input id="ko-${id}-a" inputmode="numeric" maxlength="2" aria-label="Games team 1" value="${has?sc.a:""}">${pick(t2, "t2", 1)}<input id="ko-${id}-b" inputmode="numeric" maxlength="2" aria-label="Games team 2" value="${has?sc.b:""}"></div><button class="save" data-kosave="${id}">Save</button>`;
+  } else body = side(t1, sc.a, 0) + side(t2, sc.b, 1);
+  return `<div class="ko"><div class="lbl"><span>${RR.name.replace("Comeback · ", "CB ")}${RR.n > 1 ? " " + k : ""}</span><span>${w ? "Played" : "Upcoming"}</span></div>${body}</div>`;
+}
+function roundView(r){ const RR = ROUNDS[r];
+  return `<section class="round"><h3>${RR.name}${RR.note ? `<small>${RR.note}</small>` : ""}</h3><div class="kos">${Array.from({length: RR.n}, (_, k) => koMatch(r, k+1)).join("")}</div></section>`; }
+function champBanner(id, title){ const w = winnerOf(id); return w ? `<div class="champ">${title}<b>${keyLabel(w)}</b></div>` : ""; }
+function knockoutView(){ return champBanner("F-1", "🏆 Champions") + ["R16","QF","SF","F"].map(roundView).join(""); }
+function comebackView(){ return champBanner("CF-1", "⚡ Comeback champions") + ["CQF","CSF","CF"].map(roundView).join(""); }
 function liveView(){
   if (!EV) return `<div class="empty">No tournament running right now.</div>`;
-  const played = Object.keys(scores).length, total = Object.keys(EV.groups).length * 3;
+  const played = Object.keys(scores).filter(k => /^[A-H]-\d$/.test(k)).length, total = Object.keys(EV.groups).length * 3;
   let note = liveState === "static" ? (DATA.scoresUpdated ? `<div class="note">Scores updated ${esc(DATA.scoresUpdated)}.</div>` : "") : liveState === "off" ? `<div class="note">Live scores show here once the page is opened while signed in to Claude. The draw is below.</div>`
            : canWrite ? `<div class="note admin">You can enter scores: type the games for each team and press Save. Everyone sees them live.</div>` : "";
   const groups = Object.keys(EV.groups).map(g => {
@@ -267,7 +333,10 @@ function liveView(){
     return `<section class="grp" id="g-${g}"><h3>GROUP ${g}<span style="display:flex;gap:8px;align-items:center"><small>${done}/3 played</small><button class="shr" data-gshare="${g}" aria-label="Share group ${g}">${SHARE_ICON}Share</button></span></h3>
       <table class="stand"><tr><th colspan="2">Team</th><th>P</th><th>W</th><th>L</th><th>Net</th></tr>${rows}</table>
       <div class="mts">${mts}</div></section>`; }).join("");
-  return `<div class="evhead"><h2>${esc(EV.title.split(" · ")[0])} <span>${esc(EV.title.split(" · ")[1]||"")}</span></h2><p>GROUP STAGE · ${played}/${total} MATCHES PLAYED${EV.venue?" · "+esc(EV.venue):""}</p></div>${note}<div class="groups">${groups}</div>`;
+  const subs = [["groups","Groups"],["ko","Knockout"],["cb","Comeback"]];
+  const body = sub === "ko" ? knockoutView() : sub === "cb" ? comebackView() : `<div class="groups">${groups}</div>`;
+  return `<div class="evhead"><h2>${esc(EV.title.split(" · ")[0])} <span>${esc(EV.title.split(" · ")[1]||"")}</span></h2><p>GROUPS ${played}/${total} PLAYED · TOP 2 → ROUND OF 16 · 3RD → COMEBACK${EV.venue?" · "+esc(EV.venue):""}</p></div>${note}
+    <div class="subtabs">${subs.map(([k,l]) => `<button class="subtab" data-sub="${k}" aria-pressed="${sub===k}">${l}</button>`).join("")}</div>${body}`;
 }
 async function saveScore(id){
   const a = document.getElementById(`in-${id}-a`).value.trim(), b = document.getElementById(`in-${id}-b`).value.trim();
@@ -287,6 +356,23 @@ async function saveScore(id){
   }
   setTimeout(() => { if (btn.isConnected) { btn.textContent = "Save"; btn.disabled = false; } }, 1200);
 }
+async function saveKo(id){
+  const g = x => { const el = document.getElementById(`ko-${id}-${x}`); return el ? el.value.trim() : ""; };
+  const btn = document.querySelector(`[data-kosave="${id}"]`), [r] = id.split("-"), open = !!ROUNDS[r].pool;
+  const t1 = g("t1"), t2 = g("t2"), a = g("a"), b = g("b"), doc = {};
+  const flash = m => { btn.textContent = m; setTimeout(() => { if (btn.isConnected) { btn.textContent = "Save"; btn.disabled = false; } }, 1500); };
+  if (open) { if (t1 && t1 === t2) return flash("Same team");
+    if (r === "R16" && t1 && t2 && t1.split(":")[0] === t2.split(":")[0]) return flash("Same group");
+    if (t1) doc.t1 = t1; if (t2) doc.t2 = t2; }
+  if (a !== "" || b !== "") { const na = Number(a), nb = Number(b);
+    if (!Number.isInteger(na) || !Number.isInteger(nb) || na < 0 || nb < 0 || na > 20 || nb > 20) return flash("0–20");
+    if (na === nb) return flash("No draw"); doc.a = na; doc.b = nb; }
+  btn.disabled = true;
+  try { const ref = dbRef.collection("live/" + EV.id + "/matches").doc(id);
+    if (!Object.keys(doc).length) await ref.delete(); else await ref.set(doc); btn.textContent = "Saved ✓"; }
+  catch (e) { btn.textContent = "Not saved"; if (e && e.code === "invalid_argument") { canWrite = false; render(); return; } }
+  setTimeout(() => { if (btn.isConnected) { btn.textContent = "Save"; btn.disabled = false; } }, 1200);
+}
 async function startLive(){
   if (!EV) return;
   const tl = document.getElementById("tab-live"); tl.hidden = false; tab = "live";
@@ -298,9 +384,12 @@ async function startLive(){
   const w = user ? await user.can("data.write") : null;
   canWrite = w === true || (w === null && user ? await user.canEdit() : false);
   db.collection("live/" + EV.id + "/matches").onSnapshot(snap => {
-    scores = {}; snap.docs.forEach(d => { const v = d.data(); if (v && Number.isFinite(v.a) && Number.isFinite(v.b)) scores[d.id] = {a: v.a, b: v.b}; });
+    scores = {}; snap.docs.forEach(d => { const v = d.data(); if (!v) return; const o = {};
+      if (Number.isFinite(v.a) && Number.isFinite(v.b)) { o.a = v.a; o.b = v.b; }
+      if (typeof v.t1 === "string") o.t1 = v.t1; if (typeof v.t2 === "string") o.t2 = v.t2;
+      if (Object.keys(o).length) scores[d.id] = o; });
     liveState = "on";
-    const focused = document.activeElement && document.activeElement.id && document.activeElement.id.startsWith("in-");
+    const focused = document.activeElement && document.activeElement.id && /^(in|ko)-/.test(document.activeElement.id);
     if (tab === "live" && !focused) render();
   }, () => { liveState = "off"; if (tab === "live") render(); });
 }
@@ -354,6 +443,8 @@ function openPlayer(id){
 }
 function closePlayer(){ document.getElementById("sheet").hidden = true; try { history.replaceState(null, "", location.pathname + location.search); } catch(e) {} }
 document.addEventListener("click", e => { const sv = e.target.closest("[data-save]"); if (sv) { saveScore(sv.dataset.save); return; }
+  const ks = e.target.closest("[data-kosave]"); if (ks) { saveKo(ks.dataset.kosave); return; }
+  const sb = e.target.closest("[data-sub]"); if (sb) { sub = sb.dataset.sub; render(); return; }
   const gs = e.target.closest("[data-gshare]"); if (gs) { const g = gs.dataset.gshare; const st = standings(g);
     share({title: `Group ${g} · ${EV.title}`, text: `Power Padel ${EV.title} — Group ${g}
 ` + st.map((r,i) => `${i+1}. ${teamName(r.t)} (W${r.w} · NET ${r.gf-r.ga>0?"+":""}${r.gf-r.ga})`).join("\n"), hash: "g-" + g}); return; }
