@@ -234,6 +234,7 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .mshr{background:none;border:0;color:var(--muted);cursor:pointer;padding:2px 4px;font-size:13px;grid-column:1/-1;justify-self:center;margin-top:-4px}
 .mshr:hover{color:var(--gold)}
 .hero{display:block;width:100%;max-width:420px;border-radius:12px;border:1px solid var(--line);margin-bottom:10px}
+.rkbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 12px;font:700 13px var(--cond);letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
 .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--gold);color:#111;font-weight:800;padding:10px 16px;border-radius:999px;z-index:40;box-shadow:0 10px 30px rgba(0,0,0,.5)}
 .flash{outline:2px solid var(--gold);outline-offset:3px}
 
@@ -339,6 +340,7 @@ function rankView(){
   let html = "";
   if (!q){
     const [a,b,c] = P;
+    html += `<div class="rkbar"><span>${esc(DATA.updated)} · ${P.length} players</span><button class="shr" id="rkshare" aria-label="Share the full ranking">${SHARE_ICON}Share ranking</button></div>`;
     html += `<div class="podium">${[[b,2],[a,1],[c,3]].map(([p,i]) => `<button class="pod p${i}" data-id="${p.id}">${av(p)}<div class="r">#${p.rank}</div><div class="n">${esc(p.name)}</div><div class="pt">${p.pts} pts</div></button>`).join("")}</div>`;
   }
   html += list.length ? `<div class="list">${list.map(p => `<button class="row" data-id="${p.id}"><span class="rk ${p.rank<=10?"top":""}">${p.rank}</span>${av(p)}<span class="nm">${esc(p.name)}</span>${mv(p.move)}<span class="pts">${p.pts}</span></button>`).join("")}</div>`
@@ -628,6 +630,8 @@ document.addEventListener("click", e => { const sv = e.target.closest("[data-sav
   const pst = e.target.closest("[data-poster]"); if (pst) { share({title: "Power Padel schedule", text: `Power Padel ${EV.title} · match schedule`, hash: "", imgUrl: pst.dataset.poster, imgName: pst.dataset.poster}); return; }
   const ks = e.target.closest("[data-kosave]"); if (ks) { saveKo(ks.dataset.kosave); return; }
   const sb = e.target.closest("[data-sub]"); if (sb) { sub = sb.dataset.sub; render(); return; }
+  if (e.target.closest("#rkshare")) { const md = ["🥇","🥈","🥉"];
+    share({title: "Power Padel ranking 2026", text: `🏆 Power Padel 2026 live ranking — ${DATA.updated}\n\n` + P.map(p => `${md[p.rank-1] || p.rank + "."} ${p.name} — ${p.pts} pts${p.move > 0 ? " ▲" + p.move : p.move < 0 ? " ▼" + (-p.move) : p.move === null ? " 🆕" : ""}`).join("\n"), hash: "rank"}); return; }
   const rs = e.target.closest("[data-rshare]"); if (rs) { const r = rs.dataset.rshare, RR = ROUNDS[r];
     const lines = Array.from({length: RR.n}, (_, k) => { const id = `${r}-${k+1}`, sc = scores[id] || {}, [t1, t2] = teamsOf(id), kt = (EV.ko_times || {})[id];
       const n1 = t1 ? keyText(t1) : "TBD", n2 = t2 ? keyText(t2) : "TBD", w = winnerOf(id);
@@ -666,7 +670,8 @@ startLive();
 function openFromHash(){
   const h = location.hash.slice(1);
   let m;
-  if ((m = /^p-([a-z0-9-]+)$/.exec(h)) && bySlug[m[1]]) openPlayer(bySlug[m[1]].id);
+  if (h === "rank") { tab = "rank"; render(); }
+  else if ((m = /^p-([a-z0-9-]+)$/.exec(h)) && bySlug[m[1]]) openPlayer(bySlug[m[1]].id);
   else if ((m = /^p(\d+)$/.exec(h)) && byId[m[1]]) openPlayer(+m[1]);
   else if ((m = /^r-([A-Z]+)$/.exec(h)) && EV && ROUNDS[m[1]]) { tab = "live"; sub = m[1].startsWith("C") ? "cb" : "ko"; render(); const el = document.getElementById("r-" + m[1]); if (el) { el.scrollIntoView({block: "start"}); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 2000); } }
   else if ((m = /^g-([A-H])$/.exec(h)) && EV) { tab = "live"; sub = "groups"; render(); const el = document.getElementById("g-" + m[1]); if (el) { el.scrollIntoView({block: "start"}); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 2000); } }
