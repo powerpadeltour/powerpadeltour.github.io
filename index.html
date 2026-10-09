@@ -174,6 +174,13 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .t4 .ko{border:2px solid var(--gold);border-radius:18px;padding:20px 22px;gap:12px;background:radial-gradient(120% 140% at 50% 0%,var(--gold-soft),transparent 70%),var(--surface);box-shadow:0 0 0 4px var(--gold-soft)}
 .t4 .ko .lbl{justify-content:center;gap:12px;font-size:14px}
 .t4 .side{font-size:22px}.t4 .side .g{font-size:30px;min-width:42px}
+.round.now{margin-top:18px}
+.round.now:first-child{margin-top:0}
+.now .rdiv span{font-size:22px}
+.now.nl .ko{border:2px solid var(--down);box-shadow:0 0 0 3px rgba(255,107,94,.15)}
+.now.nl .rdiv span{color:var(--down)}
+.now.nl .rdiv::before,.now.nl .rdiv::after{background:linear-gradient(90deg,transparent,var(--down),transparent)}
+.now.nd .ko{opacity:.92}
 .champs{margin-top:34px;text-align:center;border:2px solid var(--gold);border-radius:20px;padding:24px 18px;background:radial-gradient(100% 120% at 50% 0%,var(--gold-soft),transparent 75%),var(--surface)}
 .champs .cup{font-size:46px;line-height:1}
 .champs h3{font-family:var(--display);font-style:italic;font-weight:900;font-size:40px;text-transform:uppercase;color:var(--gold);margin:6px 0}
@@ -325,7 +332,7 @@ function standings(g){
     if (!s || s.a === s.b) return 0; const xWon = (PAIRS[k][0]===x.i) ? s.a > s.b : s.b > s.a; return xWon ? -1 : 1; };
   return teams.sort((x, y) => (y.w - x.w) || ((y.gf-y.ga) - (x.gf-x.ga)) || h2h(x, y) || (y.gf - x.gf) || (x.i - y.i));
 }
-let sub = "sched";
+let sub = "now";
 const ROUNDS = {
   R16: {name: "Round of 16", n: 8, pool: w => Object.keys(EV.groups).map(g => posKey(g, w === "t1" ? 1 : 2)).filter(Boolean),
         ph: () => ["A group winner", "A group runner-up"], note: "Draw · each group winner vs a runner-up from another group"},
@@ -400,6 +407,20 @@ function cdHtml(){ if (!EV || !EV.start) return "";
 setInterval(() => { const el = document.getElementById("cd"); if (!el || !EV || !EV.start) return; const p = cdParts();
   if (!p) { if (!el.classList.contains("live")) render(); return; }
   ["days","hrs","min","sec"].forEach((l, i) => { const b = el.querySelector(`[data-cd="${l}"]`); if (b) b.textContent = String(p[i]).padStart(2, "0"); }); }, 1000);
+function nowView(){
+  const ORDER = ["F","CF","SF","CSF","QF","CQF","R16"], ids = [];
+  ORDER.forEach(r => { for (let k = 1; k <= ROUNDS[r].n; k++) ids.push([r, k]); });
+  const sc = id => scores[id] || {}, ready = ([r, k]) => { const [a, b] = teamsOf(`${r}-${k}`); return a && b && !a.startsWith("pos:") && !b.startsWith("pos:"); };
+  const live = ids.filter(([r, k]) => sc(`${r}-${k}`).live && !winnerOf(`${r}-${k}`));
+  const T = EV.ko_times || {};
+  const next = ids.filter(x => { const id = `${x[0]}-${x[1]}`; return !winnerOf(id) && !sc(id).live && ready(x); })
+    .sort((x, y) => (T[`${x[0]}-${x[1]}`] || "99").localeCompare(T[`${y[0]}-${y[1]}`] || "99"));
+  const done = ids.filter(([r, k]) => winnerOf(`${r}-${k}`));
+  const block = (cls, title, list, empty) => `<section class="round now ${cls}"><div class="rdiv"><span>${title}</span></div>${list.length ? `<div class="kos">${list.map(([r, k]) => koMatch(r, k)).join("")}</div>` : `<div class="rnote">${empty}</div>`}</section>`;
+  return block("nl", "🔴 Live now", live, "No match on court right now")
+       + block("nn", "🕒 Up next", next, "Waiting for the next draw")
+       + block("nd", "✅ Results", done, "No knockout results yet");
+}
 function knockoutView(){ return ["R16","QF","SF","F"].map(roundView).join("") + champsBlock("F-1", "Champions", "🏆"); }
 function comebackView(){ return ["CQF","CSF","CF"].map(roundView).join("") + champsBlock("CF-1", "Comeback champions", "⚡"); }
 function liveView(){
@@ -421,8 +442,8 @@ function liveView(){
     return `<section class="grp" id="g-${g}"><h3>GROUP ${g}<span style="display:flex;gap:8px;align-items:center"><small>${done}/3 played</small><button class="shr" data-gshare="${g}" aria-label="Share group ${g}">${SHARE_ICON}Share</button></span></h3>
       <table class="stand"><tr><th colspan="2">Team</th><th>P</th><th>W</th><th>L</th><th>Net</th></tr>${rows}</table>
       <div class="mts">${mts}</div></section>`; }).join("");
-  const subs = [["sched","Schedule"],["groups","Groups"],["ko","Knockout"],["cb","Comeback"]];
-  const body = sub === "sched" ? scheduleView() : sub === "ko" ? knockoutView() : sub === "cb" ? comebackView() : `<div class="groups">${groups}</div>`;
+  const subs = [["now","Now"],["sched","Schedule"],["groups","Groups"],["ko","Knockout"],["cb","Comeback"]];
+  const body = sub === "now" ? nowView() : sub === "sched" ? scheduleView() : sub === "ko" ? knockoutView() : sub === "cb" ? comebackView() : `<div class="groups">${groups}</div>`;
   return `<div class="evhead"><h2>${esc(EV.title.split(" · ")[0])} <span>${esc(EV.title.split(" · ")[1]||"")}</span></h2><p>GROUPS ${played}/${total} PLAYED · TOP 2 → ROUND OF 16 · 3RD → COMEBACK${EV.venue?" · "+esc(EV.venue):""}</p></div>${note}
     ${cdHtml()}<div class="subtabs">${subs.map(([k,l]) => `<button class="subtab" data-sub="${k}" aria-pressed="${sub===k}">${l}</button>`).join("")}</div>${body}`;
 }
