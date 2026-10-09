@@ -234,11 +234,11 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .mshr{background:none;border:0;color:var(--muted);cursor:pointer;padding:2px 4px;font-size:13px;grid-column:1/-1;justify-self:center;margin-top:-4px}
 .mshr:hover{color:var(--gold)}
 .hero{display:block;width:100%;max-width:420px;border-radius:12px;border:1px solid var(--line);margin-bottom:10px}
-.tbl tr.clk{cursor:pointer}
-.tbl tr.clk:hover td{background:var(--surface-2)}
-.tbl tr.clk .car{color:var(--gold);display:inline-block;width:12px}
-.tbl tr.clk .tap{display:block;font:600 11px var(--cond);letter-spacing:1px;color:var(--gold);text-transform:uppercase;margin-left:16px}
-.tbl tr.pmrow td{padding:0 0 10px;border-top:0}
+.tlink{background:none;border:0;padding:0;font:inherit;font-weight:800;color:var(--gold);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.pmodal{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px}
+.pmbox{width:100%;max-width:440px;max-height:85vh;overflow:auto;background:var(--surface);border:1px solid var(--gold);border-radius:16px;padding:12px 14px 14px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.pmtop{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+.pmtop b{font-family:var(--display);font-style:italic;font-weight:900;font-size:18px;text-transform:uppercase}
 .pmw{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
 .pmp{font:700 12px var(--cond);letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
 .pmh{font-family:var(--display);font-style:italic;font-weight:900;font-size:14px;text-transform:uppercase;color:var(--gold);margin:8px 0 4px;padding-left:8px;border-left:3px solid var(--gold)}
@@ -642,7 +642,7 @@ function openPlayer(id){
   const mx = Math.max(1, ...bars.map(b => b[1]));
   const t26 = DATA.tours.map(t => { const r = p.t26[t.id];
     const pm = r && EV && t.id === EV.tid ? playerMatches(p.id) : "";
-    if (pm) return `<tr class="clk" data-pm="${t.id}" tabindex="0" aria-expanded="false"><td><span class="car">▸</span> ${t.id} · ${esc(t.date)}<small class="tap">Tap for matches</small></td><td><span class="st ${r.s==="Winner"?"w":r.s==="Runner-up"?"f":""}">${ST[r.s]||r.s}</span></td><td class="num">+${r.p}</td></tr><tr class="pmrow" hidden><td colspan="3">${pm}</td></tr>`;
+    if (pm) return `<tr><td><button class="tlink" data-pm="${t.id}" aria-label="${t.id} matches">${t.id}</button> · ${esc(t.date)}</td><td><span class="st ${r.s==="Winner"?"w":r.s==="Runner-up"?"f":""}">${ST[r.s]||r.s}</span></td><td class="num">+${r.p}</td></tr>`;
     return r ? `<tr><td>${t.id} · ${esc(t.date)}</td><td><span class="st ${r.s==="Winner"?"w":r.s==="Runner-up"?"f":""}">${ST[r.s]||r.s}</span></td><td class="num">+${r.p}</td></tr>`
              : `<tr class="miss"><td>${t.id} · ${esc(t.date)}</td><td>Did not play</td><td class="num">—</td></tr>`; }).join("");
   const hist = p.curve.slice().reverse().map(([t,lv,cb]) => `<tr class="${lv?"":"miss"}"><td>${t}</td><td>${lv ? `<span class="st ${lv===6?"w":lv===5?"f":""}">${lv===5?"2nd place":LV[lv]}</span>` : "Did not play"}${cb ? ` <span class="st">${cb==="W"?"⚡ Comeback champion":"Comeback 2nd"}</span>` : ""}</td></tr>`).join("");
@@ -656,8 +656,12 @@ function openPlayer(id){
     <div class="sec"><h4>Journey · best stage each tournament</h4>${chart(p.curve)}<div class="legend">Filled gold dot = title · ⚡ = comeback title · grey dot = did not play</div></div>
     <div class="sec"><h4>Every tournament</h4><div class="scroll"><table class="tbl"><tr><th>Tournament</th><th>Best stage</th></tr>${hist}</table></div></div>`;
   document.getElementById("sheet").hidden = false;
-  document.querySelectorAll("#panel [data-pm]").forEach(tr => { const tog = () => { const nx = tr.nextElementSibling, open = nx.hidden; nx.hidden = !open; tr.setAttribute("aria-expanded", open); tr.querySelector(".car").textContent = open ? "▾" : "▸"; };
-    tr.onclick = tog; tr.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tog(); } }; });
+  document.querySelectorAll("#panel [data-pm]").forEach(b => b.onclick = () => {
+    const m = document.createElement("div"); m.className = "pmodal"; m.setAttribute("role", "dialog"); m.setAttribute("aria-modal", "true");
+    m.innerHTML = `<div class="pmbox"><div class="pmtop"><b>${esc(p.name)} · ${b.dataset.pm}</b><button class="close" aria-label="Close">✕</button></div>${playerMatches(p.id)}</div>`;
+    const shut = () => { m.remove(); document.removeEventListener("keydown", esc2); b.focus(); }, esc2 = e => { if (e.key === "Escape") { e.stopPropagation(); shut(); } };
+    m.onclick = e => { if (e.target === m || e.target.closest(".pmtop .close")) shut(); else if (e.target.closest("[data-id]")) m.remove(); };
+    document.addEventListener("keydown", esc2, true); document.body.appendChild(m); m.querySelector(".close").focus(); });
   document.getElementById("close").onclick = closePlayer;
   document.getElementById("close").focus();
   try { history.replaceState(null, "", "#p-" + p.slug); } catch(e) {}
