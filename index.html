@@ -181,6 +181,9 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .now.nl .rdiv span{color:var(--down)}
 .now.nl .rdiv::before,.now.nl .rdiv::after{background:linear-gradient(90deg,transparent,var(--down),transparent)}
 .now.nd .ko{opacity:.92}
+.nsub{font-family:var(--display);font-style:italic;font-weight:900;font-size:17px;text-transform:uppercase;margin:16px 0 8px;padding-left:10px;border-left:4px solid var(--gold);display:flex;align-items:baseline;gap:10px}
+.nsub small{font:600 12px var(--cond);letter-spacing:1px;color:var(--muted);font-style:normal;text-transform:none}
+.nday{margin:18px 0 0;font:800 13px var(--cond);letter-spacing:3px;text-transform:uppercase;color:var(--bg);background:var(--gold);display:inline-block;padding:3px 12px;border-radius:999px}
 .champs{margin-top:34px;text-align:center;border:2px solid var(--gold);border-radius:20px;padding:24px 18px;background:radial-gradient(100% 120% at 50% 0%,var(--gold-soft),transparent 75%),var(--surface)}
 .champs .cup{font-size:46px;line-height:1}
 .champs h3{font-family:var(--display);font-style:italic;font-weight:900;font-size:40px;text-transform:uppercase;color:var(--gold);margin:6px 0}
@@ -416,10 +419,17 @@ function nowView(){
   const next = ids.filter(x => { const id = `${x[0]}-${x[1]}`; return !winnerOf(id) && !sc(id).live && ready(x); })
     .sort((x, y) => (T[`${x[0]}-${x[1]}`] || "99").localeCompare(T[`${y[0]}-${y[1]}`] || "99"));
   const done = ids.filter(([r, k]) => winnerOf(`${r}-${k}`));
-  const block = (cls, title, list, empty) => `<section class="round now ${cls}"><div class="rdiv"><span>${title}</span></div>${list.length ? `<div class="kos">${list.map(([r, k]) => koMatch(r, k)).join("")}</div>` : `<div class="rnote">${empty}</div>`}</section>`;
-  return block("nl", "🔴 Live now", live, "No match on court right now")
-       + block("nn", "🕒 Up next", next, "Waiting for the next draw")
-       + block("nd", "✅ Results", done, "No knockout results yet");
+  const RO = ["F","CF","SF","CSF","QF","CQF","R16"], DAY1 = new Set(["R16"]);
+  const byRound = list => { const g = {}; list.forEach(x => (g[x[0]] ||= []).push(x)); return g; };
+  const sub = (r, l) => `<h4 class="nsub">${ROUNDS[r].name}<small>${l.length} match${l.length > 1 ? "es" : ""}</small></h4><div class="kos">${l.map(([r, k]) => koMatch(r, k)).join("")}</div>`;
+  const grouped = (list, order) => { const g = byRound(list); return order.filter(r => g[r]).map(r => sub(r, g[r])).join(""); };
+  const block = (cls, title, inner, empty) => `<section class="round now ${cls}"><div class="rdiv"><span>${title}</span></div>${inner || `<div class="rnote">${empty}</div>`}</section>`;
+  const nextOrder = [...new Set(next.map(x => x[0]))];
+  const today = done.filter(x => !DAY1.has(x[0])), day1 = done.filter(x => DAY1.has(x[0]));
+  const res = (today.length ? `<div class="nday">Today · Day 2</div>${grouped(today, RO)}` : "") + (day1.length ? `<div class="nday">Day 1</div>${grouped(day1, RO)}` : "");
+  return block("nl", "🔴 Live now", live.length ? `<div class="kos">${live.map(([r, k]) => koMatch(r, k)).join("")}</div>` : "", "No match on court right now")
+       + block("nn", "🕒 Up next", grouped(next, nextOrder), "Waiting for the next draw")
+       + block("nd", "✅ Results", res, "No knockout results yet");
 }
 function knockoutView(){ return ["R16","QF","SF","F"].map(roundView).join("") + champsBlock("F-1", "Champions", "🏆"); }
 function comebackView(){ return ["CQF","CSF","CF"].map(roundView).join("") + champsBlock("CF-1", "Comeback champions", "⚡"); }
